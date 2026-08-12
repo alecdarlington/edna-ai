@@ -1,0 +1,40 @@
+# Secrets and credentials
+.env
+.env.local
+secrets.toml
+
+# Backups
+*.bak
+*.backup
+
+# Temporary files
+staged_*.json
+*.tmp
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.coverage
+
+# Streamlit cache
+.streamlit/cache/
+
+# Large files (optional - if you want to exclude PDFs)
+# *.pdf

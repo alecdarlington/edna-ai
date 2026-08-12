@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pip list *)",
+      "Bash(python *)",
+      "Bash(PYTHONIOENCODING=utf-8 python *)",
+      "Bash(node *)",
+      "Bash(pip install *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:8501)",
+      "Skill(run)",
+      "PowerShell(Start-Process \"http://localhost:8501\")",
+      "PowerShell(Get-Process *)",
+      "PowerShell(Start-Process cmd.exe -ArgumentList \"/k\", \"cd /d C:\\\\Users\\\\darli\\\\Desktop\\\\edna-ai && python -m streamlit run app.py\" -WindowStyle Normal)",
+      "Bash(timeout 20 streamlit run app.py --server.headless true --server.port 8599)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\\\\n\" http://localhost:8599)",
+      "Bash(curl -s -m 2 http://localhost:8523/_stcore/health)",
+      "PowerShell(Get-NetTCPConnection *)",
+      "Bash(powershell -NoProfile -Command '[Environment]::GetEnvironmentVariable\\('\\\\''OPENAI_API_KEY'\\\\'','\\\\''User'\\\\''\\) -ne $null')",
+      "Bash(echo \"--- exit code: $? ---\")",
+      "Bash(grep -rho \".\\\\{260\\\\}An error has occurred, please try again.\\\\{80\\\\}\" .)",
+      "PowerShell(Get-NetTCPConnection)",
+      "Bash(pdftotext -enc UTF-8 \"Recetario Proteínas - Edna Cochez.pdf\" -)",
+      "Bash(echo \"exit=$?\")",
+      "Bash(set -e)"
+    ]
+  }
+}
