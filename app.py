@@ -280,7 +280,6 @@ def handle_audio(clip) -> None:
 
 # ── Admin view ──────────────────────────────────────────────────────────────────
 if _show_admin_view():
-    st.set_page_config(layout="wide")  # wider layout for table
     st.title("📊 Admin: Query Gaps")
     st.markdown("**Most recent gaps (knowledge base misses)**")
 
