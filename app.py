@@ -353,6 +353,29 @@ if _show_admin_view():
             st.info("No activity logged yet.")
         else:
             st.markdown(f"**Recent events: {len(activities)}**")
+
+            # Show response events with full details
+            response_events = [a for a in activities if a.get("event_type") == "response"]
+            if response_events:
+                st.subheader("📝 AI Responses")
+                for resp in response_events[:10]:  # Show last 10 responses
+                    with st.expander(
+                        f"Q: {resp.get('question', '')[:80]} | Route: {resp.get('route', '')} | "
+                        f"Recipes: {resp.get('recipes_found', 0)} | Theory: {resp.get('theory_found', 0)}"
+                    ):
+                        st.markdown("**Full Response:**")
+                        st.markdown(resp.get("reply", ""), unsafe_allow_html=True)
+                        st.divider()
+                        st.markdown("**Metadata:**")
+                        st.json({
+                            "timestamp": resp.get("timestamp", ""),
+                            "route": resp.get("route", ""),
+                            "recipes_found": resp.get("recipes_found", 0),
+                            "theory_found": resp.get("theory_found", 0),
+                        })
+
+            # Table of all events
+            st.subheader("📋 All Events")
             activity_rows = []
             for a in activities:
                 ts = a.get("timestamp", "").replace("T", " ").split(".")[0]
@@ -494,12 +517,14 @@ if st.session_state.pending:
                 reply = result["reply"]
                 metadata = result["metadata"]
 
-                # Log activity: API call succeeded
+                # Log activity: API call succeeded with full details
                 log_activity("api_call_success", {
                     "question": question,
                     "route": metadata["route"],
                     "recipes_found": metadata["recipes_found"],
                     "theory_found": metadata["theory_found"],
+                    "reply_length": len(reply),
+                    "reply_preview": reply[:300],
                 })
             except Exception as e:  # surface API/network issues kindly
                 reply = (
@@ -514,6 +539,15 @@ if st.session_state.pending:
                     "question": question,
                     "error": str(e)[:200],
                 })
+
+        # Log full response details
+        log_activity("response", {
+            "question": question,
+            "route": metadata["route"],
+            "recipes_found": metadata["recipes_found"],
+            "theory_found": metadata["theory_found"],
+            "reply": reply,
+        })
 
         # Detect and log gaps
         gap = detect_gap(
