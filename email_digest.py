@@ -5,16 +5,20 @@ Sends a summary email of:
 - Knowledge base gaps detected
 - Statistics on AI responses
 - Top queries
+
+Uses Gmail SMTP (free, no credit card needed)
 """
 
 import os
+import smtplib
 from datetime import datetime, timedelta
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from gaps import read_gaps, read_activity
-import requests
 
 
-SENDGRID_API_KEY = os.environ.get("SENDGRID_API_KEY", "").strip()
-FROM_EMAIL = os.environ.get("SENDGRID_FROM_EMAIL", "").strip()
+GMAIL_EMAIL = os.environ.get("GMAIL_EMAIL", "").strip()
+GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "").strip()
 ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").strip()
 
 
@@ -150,14 +154,15 @@ def build_digest_html() -> str:
 
 def send_digest_email(to_email: str | None = None) -> dict:
     """
-    Send digest email via SendGrid.
+    Send digest email via Gmail SMTP (free, no credit card needed).
 
     Returns: {"success": bool, "message": str}
     """
-    if not SENDGRID_API_KEY or not FROM_EMAIL:
+    if not GMAIL_EMAIL or not GMAIL_APP_PASSWORD:
         return {
             "success": False,
-            "message": "Missing SendGrid credentials (SENDGRID_API_KEY or SENDGRID_FROM_EMAIL)",
+            "message": "Missing Gmail credentials (GMAIL_EMAIL or GMAIL_APP_PASSWORD). "
+                       "See EMAIL_DIGEST_SETUP.md for instructions.",
         }
 
     recipient = to_email or ADMIN_EMAIL
@@ -165,39 +170,40 @@ def send_digest_email(to_email: str | None = None) -> dict:
         return {"success": False, "message": "No recipient email configured"}
 
     html_body = build_digest_html()
-
-    payload = {
-        "personalizations": [{"to": [{"email": recipient}]}],
-        "from": {"email": FROM_EMAIL},
-        "subject": f"🍳 Edna AI Daily Digest — {datetime.utcnow().strftime('%Y-%m-%d')}",
-        "content": [{"type": "text/html", "value": html_body}],
-    }
-
-    headers = {
-        "Authorization": f"Bearer {SENDGRID_API_KEY}",
-        "Content-Type": "application/json",
-    }
+    subject = f"🍳 Edna AI Daily Digest — {datetime.utcnow().strftime('%Y-%m-%d')}"
 
     try:
-        response = requests.post(
-            "https://api.sendgrid.com/v3/mail/send",
-            json=payload,
-            headers=headers,
-            timeout=10,
-        )
+        # Create message
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = subject
+        msg["From"] = GMAIL_EMAIL
+        msg["To"] = recipient
 
-        if response.status_code in (200, 201, 202):
-            return {
-                "success": True,
-                "message": f"Digest sent to {recipient}",
-            }
-        else:
-            return {
-                "success": False,
-                "message": f"SendGrid error ({response.status_code}): {response.text[:200]}",
-            }
+        # Attach HTML body
+        msg.attach(MIMEText(html_body, "html"))
+
+        # Connect to Gmail SMTP and send
+        with smtplib.SMTP_SSL("smtp.gmail.com", 465, timeout=10) as server:
+            server.login(GMAIL_EMAIL, GMAIL_APP_PASSWORD)
+            server.sendmail(GMAIL_EMAIL, recipient, msg.as_string())
+
+        return {
+            "success": True,
+            "message": f"✅ Digest sent to {recipient}",
+        }
+
+    except smtplib.SMTPAuthenticationError:
+        return {
+            "success": False,
+            "message": "Gmail authentication failed. Check your App Password (not your regular password).",
+        }
+    except smtplib.SMTPException as e:
+        return {
+            "success": False,
+            "message": f"Gmail SMTP error: {str(e)[:150]}",
+        }
     except Exception as e:
         return {
             "success": False,
-            "message": f"Error sending email: {str(e)[:200]}",
+            "message": f"Error sending email: {str(e)[:150]}",
         }

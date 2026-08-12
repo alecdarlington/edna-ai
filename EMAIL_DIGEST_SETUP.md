@@ -1,89 +1,71 @@
-# Email Digest Setup Guide
+# Email Digest Setup Guide (Gmail)
 
-The Edna AI app can send daily digests summarizing:
+The Edna AI app sends daily digests summarizing:
 - Knowledge gaps detected
 - Query statistics
 - Route distribution
 - Sample queries
 
-## About SendGrid + Twilio
-
-**SendGrid is now part of Twilio** (acquired in 2019). The good news: the SendGrid email API is unchanged and still free. You just manage it through the Twilio Console now.
-
-- **Twilio Console**: https://www.twilio.com/console/sendgrid
-- **SendGrid API**: Still works exactly the same (v3 REST API)
-- **Free tier**: Still available (100 emails/day)
-- **No changes needed**: If you already have a SendGrid account, just log in with your existing credentials
+**This guide uses Gmail (free, no credit card needed)**
 
 ---
 
-## Step 1: Create SendGrid Account (via Twilio)
+## Step 1: Enable 2-Step Verification on Gmail
 
-1. Go to **https://www.twilio.com/console/sendgrid/apps** (Twilio/SendGrid Console)
-2. Or sign up at **https://sendgrid.com/free** (redirects to Twilio)
-3. Sign up with your email
-4. Verify your email address
-5. Log in to the Twilio Console
+1. Go to **https://myaccount.google.com/security**
+2. Look for **2-Step Verification**
+3. If not enabled:
+   - Click **2-Step Verification**
+   - Follow the prompts to verify your phone number
+   - Enable it
 
-## Step 2: Generate API Key
+## Step 2: Generate Gmail App Password
 
-1. In Twilio Console, go to **SendGrid** → **Settings** → **API Keys**
-2. Click **Create API Key** (blue button)
-3. Name it: `edna-ai-digest`
-4. Keep permissions as **Restricted Access**
-5. Enable only: **Mail Send**
-6. Click **Create & View**
-7. **Copy the key** (it looks like `SG.xxxxxxxxxxxxx`)
-   - ⚠️ You can only see it once! Copy it now.
-8. Save it somewhere safe
+1. Go to **https://myaccount.google.com/apppasswords**
+2. Select:
+   - **App**: Mail
+   - **Device**: Windows Computer (or your device)
+3. Click **Generate**
+4. Google will show a **16-character password** (with spaces)
+5. **Copy it exactly** (e.g., `abcd efgh ijkl mnop`)
+   - ⚠️ Copy the whole thing including spaces!
 
-## Step 3: Verify Sender Email
-
-1. In Twilio Console, go to **SendGrid** → **Sender Authentication**
-2. Click **Verify a Sender**
-3. Enter:
-   - **From Name**: `Edna AI`
-   - **From Email**: Your email (e.g., `darlingtonalec@gmail.com`)
-   - **Reply To Email**: Same email
-4. Click **Create**
-5. Check your email inbox for a verification link from SendGrid/Twilio
-6. Click the link to verify
-7. ✅ Status should show "Verified"
-
-## Step 4: Add Secrets to Streamlit Cloud
+## Step 3: Add to Streamlit Cloud Secrets
 
 Go to your Streamlit app → **Settings** → **Secrets** → Add:
 
 ```
-SENDGRID_API_KEY = "SG.your_api_key_here"
-SENDGRID_FROM_EMAIL = "darlingtonalec@gmail.com"
+GMAIL_EMAIL = "darlingtonalec@gmail.com"
+GMAIL_APP_PASSWORD = "abcd efgh ijkl mnop"
 ADMIN_EMAIL = "darlingtonalec@gmail.com"
 ```
 
-Replace with your actual values. Click **Save**.
+Replace with your actual Gmail address and the App Password you just generated.
+
+Click **Save**.
 
 The app will restart automatically.
 
-## Step 5: Test the Digest
+## Step 4: Test the Digest
 
-1. Wait 2 minutes for the app to redeploy
+1. Wait 2 minutes for Streamlit to redeploy
 2. Go to **https://edna-ai.streamlit.app/?admin=1**
 3. Log in with your admin password
 4. Scroll to **📧 Email Digest** section
 5. Click **📤 Send Digest Now**
-6. You should get an email in ~30 seconds
+6. Check your inbox in ~10 seconds
 
 ✅ If successful: "Digest sent to your@email.com"
-❌ If it fails: Check the error message (usually missing credentials)
+❌ If it fails: Check the error message
 
-## Step 6: Set Up Daily Automatic Emails
+## Step 5: Set Up Daily Automatic Emails (Optional)
 
-### Option A: Streamlit Secrets + Cron Job (Recommended)
+You can send digests automatically every day using GitHub Actions.
 
-You can add a scheduled task that runs daily. There are several ways:
+### Setup GitHub Actions Workflow
 
-**Using GitHub Actions** (easiest):
-1. Create `.github/workflows/daily-digest.yml`:
+1. Create a new file: `.github/workflows/daily-digest.yml`
+2. Paste this:
 
 ```yaml
 name: Send Daily Digest
@@ -96,58 +78,66 @@ jobs:
   send-digest:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.9'
       - run: pip install -r requirements.txt
-      - run: python -c "from email_digest import send_digest_email; send_digest_email()"
+      - run: python -c "from email_digest import send_digest_email; result = send_digest_email(); print(result['message'])"
         env:
-          SENDGRID_API_KEY: ${{ secrets.SENDGRID_API_KEY }}
-          SENDGRID_FROM_EMAIL: ${{ secrets.SENDGRID_FROM_EMAIL }}
+          GMAIL_EMAIL: ${{ secrets.GMAIL_EMAIL }}
+          GMAIL_APP_PASSWORD: ${{ secrets.GMAIL_APP_PASSWORD }}
           ADMIN_EMAIL: ${{ secrets.ADMIN_EMAIL }}
 ```
 
-2. Add secrets to your GitHub repo:
-   - Go to Settings → Secrets and variables → Actions
-   - Add `SENDGRID_API_KEY`, `SENDGRID_FROM_EMAIL`, `ADMIN_EMAIL`
+3. Add the same secrets to GitHub:
+   - Go to your repo → **Settings** → **Secrets and variables** → **Actions**
+   - Add: `GMAIL_EMAIL`, `GMAIL_APP_PASSWORD`, `ADMIN_EMAIL`
+4. Push the workflow file to main branch
+5. GitHub will run it automatically every day at 9 AM UTC
 
-3. Save and push. Workflow will run automatically every day at 9 AM UTC.
+---
 
-**Using Vercel Cron** (if you deploy elsewhere):
-- Similar setup with cron endpoints
+## Email Contents
 
-### Option B: Manual Daily Reminder
+The daily digest includes:
 
-Just visit admin → **Send Digest Now** each day.
+- **📊 Summary**: Total queries, gaps detected, avg recipes/theory found
+- **🎯 Route Breakdown**: % of recipe vs technique questions
+- **⚠️ Knowledge Gaps**: Questions where AI had no relevant content
+- **🔍 Sample Queries**: Recent questions from that day
 
-## Digest Contents
-
-The email includes:
-- **Summary Stats**: Total queries, gaps, avg recipe/theory count
-- **Route Distribution**: Recipe % vs Technique % queries
-- **Knowledge Gaps**: Questions where AI had no relevant content
-- **Sample Queries**: Recent questions asked
+---
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| "Missing SendGrid credentials" | Add all 3 env vars to Streamlit Secrets |
-| Email not received | Check spam folder; verify sender email is verified in Twilio Console |
-| Error 401 (Unauthorized) | API key is wrong or expired; regenerate it from Twilio Console |
-| Error 403 (Forbidden) | API key doesn't have "Mail Send" permission; regenerate with restricted access |
-| "Invalid email address" | Sender email not verified in Twilio Console SendGrid settings |
-| Can't find SendGrid settings | Use **https://www.twilio.com/console/sendgrid** directly |
-
-## Email Customization
-
-Edit `email_digest.py`:
-- Change `today_gaps[-10:]` to show more/fewer gaps
-- Change `queries[-5:]` to show more/fewer sample queries
-- Modify HTML styling in `build_digest_html()`
-- Add more statistics by querying `read_activity()` and `read_gaps()`
+| "Missing Gmail credentials" | Add both GMAIL_EMAIL and GMAIL_APP_PASSWORD to Streamlit Secrets |
+| "Gmail authentication failed" | You used your regular Gmail password instead of App Password. Get a new one from myaccount.google.com/apppasswords |
+| Email not received | Check spam folder; try sending to a different email address |
+| "2-Step Verification required" | Enable 2-Step Verification at myaccount.google.com/security first |
+| App Password not working | Make sure you copied the spaces correctly (e.g., `abcd efgh ijkl mnop`) |
 
 ---
 
-**Next**: Once set up, check your email daily for insights into how Edna is performing!
+## Customizing the Digest
+
+Edit `email_digest.py` to change:
+- Number of gaps shown: `today_gaps[-10:]` (change 10)
+- Number of queries shown: `queries[-5:]` (change 5)
+- Email styling: Modify the HTML in `build_digest_html()`
+- Send time: Change `cron: '0 9 * * *'` in the workflow (currently 9 AM UTC)
+
+---
+
+## Security Notes
+
+- Your Gmail App Password is specific to this app only
+- It can ONLY send emails; it can't access your Gmail account
+- If compromised, you can revoke it from myaccount.google.com/apppasswords
+- Never commit App Password to GitHub—always use Streamlit Secrets
+
+---
+
+**You're all set!** You'll now get daily digests of Edna's performance. 🍳
