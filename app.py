@@ -12,6 +12,7 @@ import streamlit as st
 
 from answer import answer, _extract_ingredients
 from gaps import detect_gap, log_gap, read_gaps, log_activity, read_activity
+from email_digest import send_digest_email
 from transcribe import SUPPORTED_TYPES, TranscriptionError, has_api_key, transcribe
 
 # ── Admin authentication ────────────────────────────────────────────────────────
@@ -399,6 +400,24 @@ if _show_admin_view():
                 file_name="activity.jsonl",
                 mime="text/plain",
             )
+
+    st.markdown("---")
+
+    # Email digest section
+    st.subheader("📧 Email Digest")
+    col1, col2 = st.columns(2)
+    with col1:
+        custom_email = st.text_input("Send to (default: ADMIN_EMAIL):", value="", key="digest_email")
+    with col2:
+        if st.button("📤 Send Digest Now"):
+            recipient = custom_email or None
+            result = send_digest_email(to_email=recipient)
+            if result["success"]:
+                st.success(f"✅ {result['message']}")
+            else:
+                st.error(f"❌ {result['message']}")
+
+    st.markdown("*Set up **daily automatic digests** by adding a cron job or scheduler (see README)*")
 
     st.markdown("---")
     col1, col2 = st.columns(2)
