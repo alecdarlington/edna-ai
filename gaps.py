@@ -1,9 +1,12 @@
 """
 gaps.py — Log and monitor query failures (gaps in knowledge base coverage)
+          Also comprehensive activity logging for debugging
 
 A gap is detected when:
 1. Search returns zero recipes AND zero theory chunks, OR
 2. Edna's reply contains "no tengo / no está incluida" phrasing
+
+Activity log captures all user interactions and system events.
 """
 
 import json
@@ -12,6 +15,7 @@ from datetime import datetime
 
 
 GAPS_FILE = "gaps.jsonl"
+ACTIVITY_FILE = "activity.jsonl"
 
 
 def detect_gap(
@@ -25,7 +29,12 @@ def detect_gap(
     Detect if this query resulted in a gap.
 
     Returns a gap record (dict) if detected, else None.
+    Note: Ignores API errors (route_type='error')—those are system issues, not gaps.
     """
+    # Ignore API errors; they're not knowledge gaps
+    if route_type == "error":
+        return None
+
     # Criterion 1: zero results
     if num_recipes == 0 and num_theory == 0:
         return {
@@ -108,3 +117,44 @@ def get_gap_counts() -> dict:
         route = gap.get("route", "unknown")
         counts[(reason, route)] = counts.get((reason, route), 0) + 1
     return counts
+
+
+# ── Activity logging (comprehensive trace of all events) ────────────────────────
+
+def log_activity(event_type: str, details: dict) -> None:
+    """
+    Log an activity event for debugging and audit purposes.
+
+    event_type: 'query', 'search', 'api_call', 'error', 'gap', etc.
+    details: dict with event-specific data
+    """
+    record = {
+        "timestamp": datetime.utcnow().isoformat(),
+        "event_type": event_type,
+        **details,
+    }
+    try:
+        with open(ACTIVITY_FILE, "a", encoding="utf-8") as f:
+            f.write(json.dumps(record, ensure_ascii=False) + "\n")
+    except OSError:
+        pass  # Silently fail if we can't write to log
+
+
+def read_activity(limit: int = 500) -> list[dict]:
+    """Read most recent activity log entries, newest first."""
+    if not os.path.exists(ACTIVITY_FILE):
+        return []
+
+    activities = []
+    try:
+        with open(ACTIVITY_FILE, "r", encoding="utf-8") as f:
+            for line in f:
+                if line.strip():
+                    try:
+                        activities.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        pass
+    except OSError:
+        pass
+
+    return list(reversed(activities))[:limit]

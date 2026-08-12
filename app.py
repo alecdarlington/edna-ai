@@ -11,7 +11,7 @@ import os
 import streamlit as st
 
 from answer import answer, _extract_ingredients
-from gaps import detect_gap, log_gap, read_gaps
+from gaps import detect_gap, log_gap, read_gaps, log_activity, read_activity
 from transcribe import SUPPORTED_TYPES, TranscriptionError, has_api_key, transcribe
 
 # ── Admin authentication ────────────────────────────────────────────────────────
@@ -292,7 +292,13 @@ def handle_audio(clip) -> None:
     with st.spinner("Escuchando tu mensaje… 🎧"):
         try:
             text = transcribe(data, filename=getattr(clip, "name", "pregunta.wav"))
+            log_activity("voice_transcribed", {
+                "transcript": text[:200],
+            })
         except TranscriptionError as e:
+            log_activity("voice_transcription_error", {
+                "error": str(e)[:200],
+            })
             st.warning(str(e))
             return
 
@@ -305,39 +311,71 @@ if _show_admin_view():
     if not _check_admin_auth():
         st.stop()  # Stop if not authenticated
 
-    st.title("📊 Admin: Query Gaps")
-    st.markdown("**Most recent gaps (knowledge base misses)**")
+    st.title("📊 Admin Dashboard")
 
-    gaps = read_gaps(limit=100)
-    if not gaps:
-        st.info("No gaps logged yet.")
-    else:
-        st.markdown(f"**Total gaps: {len(gaps)}**")
+    # Tabs for different views
+    tab_gaps, tab_activity = st.tabs(["🔍 Query Gaps", "📋 Activity Log"])
 
-        # Display as a table
-        gap_rows = []
-        for g in gaps:
-            gap_rows.append({
-                "Time": g.get("timestamp", "").replace("T", " ").split(".")[0],
-                "Question": g.get("question", "")[:80],
-                "Route": g.get("route", ""),
-                "Recipes": g.get("recipes_found", 0),
-                "Theory": g.get("theory_found", 0),
-                "Reason": g.get("reason", ""),
-                "Reply": g.get("reply_excerpt", "")[:100],
-            })
+    with tab_gaps:
+        st.markdown("**Knowledge base misses (zero results or 'no tengo' replies)**")
+        gaps = read_gaps(limit=100)
+        if not gaps:
+            st.info("No gaps logged yet.")
+        else:
+            st.markdown(f"**Total gaps: {len(gaps)}**")
+            gap_rows = []
+            for g in gaps:
+                gap_rows.append({
+                    "Time": g.get("timestamp", "").replace("T", " ").split(".")[0],
+                    "Question": g.get("question", "")[:80],
+                    "Route": g.get("route", ""),
+                    "Recipes": g.get("recipes_found", 0),
+                    "Theory": g.get("theory_found", 0),
+                    "Reason": g.get("reason", ""),
+                    "Reply": g.get("reply_excerpt", "")[:80],
+                })
+            st.dataframe(gap_rows, use_container_width=True, hide_index=True)
 
-        st.dataframe(gap_rows, use_container_width=True, hide_index=True)
+            # Export button
+            import json
+            export_text = "\n".join(json.dumps(g, ensure_ascii=False) for g in gaps)
+            st.download_button(
+                "📥 Download gaps as JSONL",
+                export_text,
+                file_name="gaps.jsonl",
+                mime="text/plain",
+            )
 
-        # Export button
-        import json
-        export_text = "\n".join(json.dumps(g, ensure_ascii=False) for g in gaps)
-        st.download_button(
-            "📥 Download gaps as JSONL",
-            export_text,
-            file_name="gaps.jsonl",
-            mime="text/plain",
-        )
+    with tab_activity:
+        st.markdown("**All user queries and system events (comprehensive trace)**")
+        activities = read_activity(limit=200)
+        if not activities:
+            st.info("No activity logged yet.")
+        else:
+            st.markdown(f"**Recent events: {len(activities)}**")
+            activity_rows = []
+            for a in activities:
+                ts = a.get("timestamp", "").replace("T", " ").split(".")[0]
+                event_type = a.get("event_type", "unknown")
+                question = a.get("question", "")[:60] if "question" in a else ""
+                details = a.get("detail", "")[:60] if "detail" in a else ""
+                info = question or details or str(a).replace("timestamp", "").replace(event_type, "")[:60]
+
+                activity_rows.append({
+                    "Time": ts,
+                    "Event": event_type,
+                    "Info": info,
+                })
+            st.dataframe(activity_rows, use_container_width=True, hide_index=True)
+
+            # Export button
+            export_text = "\n".join(json.dumps(a, ensure_ascii=False) for a in activities)
+            st.download_button(
+                "📥 Download activity log as JSONL",
+                export_text,
+                file_name="activity.jsonl",
+                mime="text/plain",
+            )
 
     st.markdown("---")
     col1, col2 = st.columns(2)
@@ -438,6 +476,13 @@ if st.session_state.pending:
             st.caption("🎤 Mensaje de voz")
         st.markdown(question)
 
+    # Log activity: query received
+    log_activity("query", {
+        "question": question,
+        "voice": was_voice,
+        "extracted_ingredients": ings,
+    })
+
     # Generate Edna's answer
     with st.chat_message("assistant", avatar="👩‍🍳"):
         with st.spinner("Edna está pensando… 🍲"):
@@ -446,6 +491,14 @@ if st.session_state.pending:
                 result = answer(question, ings)
                 reply = result["reply"]
                 metadata = result["metadata"]
+
+                # Log activity: API call succeeded
+                log_activity("api_call_success", {
+                    "question": question,
+                    "route": metadata["route"],
+                    "recipes_found": metadata["recipes_found"],
+                    "theory_found": metadata["theory_found"],
+                })
             except Exception as e:  # surface API/network issues kindly
                 reply = (
                     "¡Ay! Tuve un problemita para responderte en este momento. 😔 "
@@ -453,6 +506,12 @@ if st.session_state.pending:
                     f"<small>Detalle técnico: {e}</small>"
                 )
                 metadata = {"route": "error", "recipes_found": 0, "theory_found": 0}
+
+                # Log activity: API call failed
+                log_activity("api_call_error", {
+                    "question": question,
+                    "error": str(e)[:200],
+                })
 
         # Detect and log gaps
         gap = detect_gap(
@@ -464,6 +523,11 @@ if st.session_state.pending:
         )
         if gap:
             log_gap(gap)
+            log_activity("gap_detected", {
+                "question": question,
+                "reason": gap.get("reason", "unknown"),
+                "route": gap.get("route", "unknown"),
+            })
 
         st.markdown(reply, unsafe_allow_html=True)
 
