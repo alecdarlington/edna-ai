@@ -476,6 +476,9 @@ if st.session_state.pending:
             st.caption("🎤 Mensaje de voz")
         st.markdown(question)
 
+    # Extract ingredients first
+    ings = _extract_ingredients(question)
+
     # Log activity: query received
     log_activity("query", {
         "question": question,
@@ -486,9 +489,8 @@ if st.session_state.pending:
     # Generate Edna's answer
     with st.chat_message("assistant", avatar="👩‍🍳"):
         with st.spinner("Edna está pensando… 🍲"):
-            ings = _extract_ingredients(question)
             try:
-                result = answer(question, ings)
+                result = answer(question, ings if ings else None)
                 reply = result["reply"]
                 metadata = result["metadata"]
 
