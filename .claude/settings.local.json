@@ -22,7 +22,10 @@
       "PowerShell(Get-NetTCPConnection)",
       "Bash(pdftotext -enc UTF-8 \"Recetario Proteínas - Edna Cochez.pdf\" -)",
       "Bash(echo \"exit=$?\")",
-      "Bash(set -e)"
+      "Bash(set -e)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   }
 }

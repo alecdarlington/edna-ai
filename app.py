@@ -6,6 +6,7 @@ Run:
 """
 
 import hashlib
+import os
 
 import streamlit as st
 
@@ -13,7 +14,28 @@ from answer import answer, _extract_ingredients
 from gaps import detect_gap, log_gap, read_gaps
 from transcribe import SUPPORTED_TYPES, TranscriptionError, has_api_key, transcribe
 
-# ── Check for admin view ────────────────────────────────────────────────────────
+# ── Admin authentication ────────────────────────────────────────────────────────
+def _check_admin_auth() -> bool:
+    """Return True if user is authenticated for admin view."""
+    if "admin_authenticated" not in st.session_state:
+        st.session_state.admin_authenticated = False
+
+    if st.session_state.admin_authenticated:
+        return True
+
+    # Show password prompt
+    st.subheader("🔐 Admin Access")
+    password = st.text_input("Enter admin password:", type="password", key="admin_pw_input")
+    if password:
+        admin_pw = os.environ.get("ADMIN_PASSWORD", "edna-gaps-admin")
+        if password == admin_pw:
+            st.session_state.admin_authenticated = True
+            st.rerun()
+        else:
+            st.error("❌ Incorrect password. Try again.")
+    return False
+
+
 def _show_admin_view() -> bool:
     """Return True if admin view should be shown (URL param: ?admin=1)."""
     try:
@@ -280,6 +302,9 @@ def handle_audio(clip) -> None:
 
 # ── Admin view ──────────────────────────────────────────────────────────────────
 if _show_admin_view():
+    if not _check_admin_auth():
+        st.stop()  # Stop if not authenticated
+
     st.title("📊 Admin: Query Gaps")
     st.markdown("**Most recent gaps (knowledge base misses)**")
 
@@ -315,7 +340,13 @@ if _show_admin_view():
         )
 
     st.markdown("---")
-    st.markdown("*To return to the main app, remove `?admin=1` from the URL.*")
+    col1, col2 = st.columns(2)
+    with col1:
+        if st.button("🚪 Logout"):
+            st.session_state.admin_authenticated = False
+            st.rerun()
+    with col2:
+        st.markdown("*Remove `?admin=1` from URL to return to main app.*")
     st.stop()  # Don't show the main app
 
 # ── Header ─────────────────────────────────────────────────────────────────────
