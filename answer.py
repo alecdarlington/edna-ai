@@ -127,7 +127,7 @@ def _build_context(
 
 # ── Main answer function ───────────────────────────────────────────────────────
 
-def answer(question: str, customer_ingredients: list[str] | None = None) -> str:
+def answer(question: str, customer_ingredients: list[str] | None = None) -> dict:
     """
     Answer a customer question in Edna's voice using retrieved context.
 
@@ -135,7 +135,15 @@ def answer(question: str, customer_ingredients: list[str] | None = None) -> str:
     customer_ingredients: optional list of ingredients the customer has,
                           e.g. ["leche", "ajo", "tomate"]
 
-    Returns Claude's answer as a plain string.
+    Returns a dict:
+      {
+        "reply": "Edna's answer text",
+        "metadata": {
+          "route": "recipe" | "technique" | "both",
+          "recipes_found": int,
+          "theory_found": int,
+        }
+      }
     """
     if customer_ingredients is None:
         customer_ingredients = []
@@ -205,7 +213,16 @@ def answer(question: str, customer_ingredients: list[str] | None = None) -> str:
         system=_SYSTEM,
         messages=[{"role": "user", "content": user_content}],
     )
-    return msg.content[0].text
+    reply = msg.content[0].text
+
+    return {
+        "reply": reply,
+        "metadata": {
+            "route": qtype,
+            "recipes_found": len(recipe_hits),
+            "theory_found": len(theory_hits),
+        },
+    }
 
 
 # ── Ingredient extractor (demo helper) ────────────────────────────────────────
@@ -262,8 +279,11 @@ if __name__ == "__main__":
               + (f"  ings: {', '.join(ings_used)}" if ings_used else "") + "]")
         print(f"{'═' * W}")
 
-        resp = answer(q, ings_used)
+        result = answer(q, ings_used)
+        resp = result["reply"]
+        meta = result["metadata"]
         print()
         print(resp)
+        print(f"\n[Metadata: route={meta['route']}, recipes={meta['recipes_found']}, theory={meta['theory_found']}]")
 
     print(f"\n{'═' * W}\n")

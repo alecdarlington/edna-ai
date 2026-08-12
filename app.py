@@ -10,7 +10,16 @@ import hashlib
 import streamlit as st
 
 from answer import answer, _extract_ingredients
+from gaps import detect_gap, log_gap, read_gaps
 from transcribe import SUPPORTED_TYPES, TranscriptionError, has_api_key, transcribe
+
+# ── Check for admin view ────────────────────────────────────────────────────────
+def _show_admin_view() -> bool:
+    """Return True if admin view should be shown (URL param: ?admin=1)."""
+    try:
+        return st.query_params.get("admin") == "1"
+    except (AttributeError, KeyError):
+        return False
 
 # ── Page config (mobile-first) ──────────────────────────────────────────────────
 st.set_page_config(
@@ -269,6 +278,47 @@ def handle_audio(clip) -> None:
     st.rerun()
 
 
+# ── Admin view ──────────────────────────────────────────────────────────────────
+if _show_admin_view():
+    st.set_page_config(layout="wide")  # wider layout for table
+    st.title("📊 Admin: Query Gaps")
+    st.markdown("**Most recent gaps (knowledge base misses)**")
+
+    gaps = read_gaps(limit=100)
+    if not gaps:
+        st.info("No gaps logged yet.")
+    else:
+        st.markdown(f"**Total gaps: {len(gaps)}**")
+
+        # Display as a table
+        gap_rows = []
+        for g in gaps:
+            gap_rows.append({
+                "Time": g.get("timestamp", "").replace("T", " ").split(".")[0],
+                "Question": g.get("question", "")[:80],
+                "Route": g.get("route", ""),
+                "Recipes": g.get("recipes_found", 0),
+                "Theory": g.get("theory_found", 0),
+                "Reason": g.get("reason", ""),
+                "Reply": g.get("reply_excerpt", "")[:100],
+            })
+
+        st.dataframe(gap_rows, use_container_width=True, hide_index=True)
+
+        # Export button
+        import json
+        export_text = "\n".join(json.dumps(g, ensure_ascii=False) for g in gaps)
+        st.download_button(
+            "📥 Download gaps as JSONL",
+            export_text,
+            file_name="gaps.jsonl",
+            mime="text/plain",
+        )
+
+    st.markdown("---")
+    st.markdown("*To return to the main app, remove `?admin=1` from the URL.*")
+    st.stop()  # Don't show the main app
+
 # ── Header ─────────────────────────────────────────────────────────────────────
 st.markdown(
     """
@@ -394,13 +444,28 @@ if st.session_state.pending:
         with st.spinner("Edna está pensando… 🍲"):
             ings = _extract_ingredients(question)
             try:
-                reply = answer(question, ings)
+                result = answer(question, ings)
+                reply = result["reply"]
+                metadata = result["metadata"]
             except Exception as e:  # surface API/network issues kindly
                 reply = (
                     "¡Ay! Tuve un problemita para responderte en este momento. 😔 "
                     "Por favor intenta de nuevo en unos segundos.\n\n"
                     f"<small>Detalle técnico: {e}</small>"
                 )
+                metadata = {"route": "error", "recipes_found": 0, "theory_found": 0}
+
+        # Detect and log gaps
+        gap = detect_gap(
+            question=question,
+            route_type=metadata["route"],
+            num_recipes=metadata["recipes_found"],
+            num_theory=metadata["theory_found"],
+            reply=reply,
+        )
+        if gap:
+            log_gap(gap)
+
         st.markdown(reply, unsafe_allow_html=True)
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
