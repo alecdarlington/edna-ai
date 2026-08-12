@@ -382,38 +382,6 @@ for msg in st.session_state.messages:
             st.caption("🎤 Mensaje de voz")
         st.markdown(msg["content"])
 
-# ── Voice input ──────────────────────────────────────────────────────────────────
-# The `expanded` flag is deliberately constant: changing it between reruns
-# remounts the panel, which aborts an in-flight recording upload and makes the
-# widget show "An error has occurred". The transcript is confirmed below instead.
-with st.container(key="voice_input_container"):
-    with st.expander("🎤 Prefiero hablar — enviar un mensaje de voz", expanded=False):
-        if not has_api_key():
-            st.info(
-                "Los mensajes de voz necesitan una clave de OpenAI. "
-                "Configura `OPENAI_API_KEY` para activarlos."
-            )
-        else:
-            st.caption("Graba tu pregunta y Edna la escuchará. Habla con normalidad.")
-            recorded = st.audio_input("Grabar", key="voice_rec", label_visibility="collapsed")
-            handle_audio(recorded)
-
-            # The recorder shows a generic "An error has occurred" when the browser
-            # finds no microphone, which tells the customer nothing — explain it and
-            # point at the upload option, which needs no mic.
-            st.caption(
-                "¿Ves un error al grabar? Significa que tu dispositivo no tiene "
-                "micrófono disponible. Puedes subir un audio en su lugar 👇"
-            )
-
-            st.caption("O sube un audio que ya tengas grabado:")
-            uploaded = st.file_uploader(
-                "Subir audio",
-                type=SUPPORTED_TYPES,
-                key="voice_file",
-                label_visibility="collapsed",
-            )
-            handle_audio(uploaded)
 
 # ── Confirm / correct the transcript before spending an answer on it ─────────────
 # Rendered outside the expander so it is always visible and so the recorder
@@ -501,3 +469,34 @@ if st.session_state.pending:
 
     st.session_state.messages.append({"role": "assistant", "content": reply})
     st.rerun()
+
+
+# ── Voice input (rendered last to avoid duplication issues) ─────────────────────
+# The `expanded` flag is deliberately constant: changing it between reruns
+# remounts the panel, which aborts an in-flight recording upload and makes the
+# widget show "An error has occurred". The transcript is confirmed below instead.
+st.divider()
+with st.expander("🎤 Prefiero hablar — enviar un mensaje de voz", expanded=False):
+    if not has_api_key():
+        st.info(
+            "Los mensajes de voz necesitan una clave de OpenAI. "
+            "Configura `OPENAI_API_KEY` para activarlos."
+        )
+    else:
+        st.caption("Graba tu pregunta y Edna la escuchará. Habla con normalidad.")
+        recorded = st.audio_input("Grabar", key="voice_rec", label_visibility="collapsed")
+        handle_audio(recorded)
+
+        st.caption(
+            "¿Ves un error al grabar? Significa que tu dispositivo no tiene "
+            "micrófono disponible. Puedes subir un audio en su lugar 👇"
+        )
+
+        st.caption("O sube un audio que ya tengas grabado:")
+        uploaded = st.file_uploader(
+            "Subir audio",
+            type=SUPPORTED_TYPES,
+            key="voice_file",
+            label_visibility="collapsed",
+        )
+        handle_audio(uploaded)
