@@ -6,35 +6,47 @@ The Edna AI app can send daily digests summarizing:
 - Route distribution
 - Sample queries
 
-## Step 1: Create SendGrid Account
+## About SendGrid + Twilio
 
-1. Go to **https://sendgrid.com/free**
-2. Sign up with your email
-3. Verify your email address
-4. Log in to the SendGrid dashboard
+**SendGrid is now part of Twilio** (acquired in 2019). The good news: the SendGrid email API is unchanged and still free. You just manage it through the Twilio Console now.
+
+- **Twilio Console**: https://www.twilio.com/console/sendgrid
+- **SendGrid API**: Still works exactly the same (v3 REST API)
+- **Free tier**: Still available (100 emails/day)
+- **No changes needed**: If you already have a SendGrid account, just log in with your existing credentials
+
+---
+
+## Step 1: Create SendGrid Account (via Twilio)
+
+1. Go to **https://www.twilio.com/console/sendgrid/apps** (Twilio/SendGrid Console)
+2. Or sign up at **https://sendgrid.com/free** (redirects to Twilio)
+3. Sign up with your email
+4. Verify your email address
+5. Log in to the Twilio Console
 
 ## Step 2: Generate API Key
 
-1. In SendGrid dashboard, go to **Settings** (left sidebar)
-2. Click **API Keys**
-3. Click **Create API Key** (blue button)
-4. Name it: `edna-ai-digest`
-5. Keep permissions as **Restricted Access**
-6. Enable only: **Mail Send**
-7. Click **Create & View**
-8. **Copy the key** (it looks like `SG.xxxxxxxxxxxxx`)
+1. In Twilio Console, go to **SendGrid** → **Settings** → **API Keys**
+2. Click **Create API Key** (blue button)
+3. Name it: `edna-ai-digest`
+4. Keep permissions as **Restricted Access**
+5. Enable only: **Mail Send**
+6. Click **Create & View**
+7. **Copy the key** (it looks like `SG.xxxxxxxxxxxxx`)
    - ⚠️ You can only see it once! Copy it now.
+8. Save it somewhere safe
 
 ## Step 3: Verify Sender Email
 
-1. In SendGrid, go to **Settings** → **Sender Authentication**
+1. In Twilio Console, go to **SendGrid** → **Sender Authentication**
 2. Click **Verify a Sender**
 3. Enter:
    - **From Name**: `Edna AI`
    - **From Email**: Your email (e.g., `darlingtonalec@gmail.com`)
    - **Reply To Email**: Same email
 4. Click **Create**
-5. Check your email inbox for a verification link from SendGrid
+5. Check your email inbox for a verification link from SendGrid/Twilio
 6. Click the link to verify
 7. ✅ Status should show "Verified"
 
@@ -122,9 +134,11 @@ The email includes:
 | Issue | Solution |
 |-------|----------|
 | "Missing SendGrid credentials" | Add all 3 env vars to Streamlit Secrets |
-| Email not received | Check SendGrid spam folder; verify sender email is verified |
-| SendGrid error 401 | API key is wrong or expired; regenerate it |
-| SendGrid error 403 | API key doesn't have "Mail Send" permission |
+| Email not received | Check spam folder; verify sender email is verified in Twilio Console |
+| Error 401 (Unauthorized) | API key is wrong or expired; regenerate it from Twilio Console |
+| Error 403 (Forbidden) | API key doesn't have "Mail Send" permission; regenerate with restricted access |
+| "Invalid email address" | Sender email not verified in Twilio Console SendGrid settings |
+| Can't find SendGrid settings | Use **https://www.twilio.com/console/sendgrid** directly |
 
 ## Email Customization
 
