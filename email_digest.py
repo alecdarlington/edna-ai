@@ -17,9 +17,18 @@ from email.mime.multipart import MIMEMultipart
 from gaps import read_gaps, read_activity
 
 
-GMAIL_EMAIL = os.environ.get("GMAIL_EMAIL", "").strip()
-GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "").strip()
-ADMIN_EMAIL = os.environ.get("ADMIN_EMAIL", "").strip()
+def _get_secret(key: str) -> str:
+    """Get secret from Streamlit Cloud or environment variables."""
+    try:
+        import streamlit as st
+        return st.secrets.get(key, "").strip()
+    except (ImportError, AttributeError):
+        return os.environ.get(key, "").strip()
+
+
+GMAIL_EMAIL = _get_secret("GMAIL_EMAIL")
+GMAIL_APP_PASSWORD = _get_secret("GMAIL_APP_PASSWORD")
+ADMIN_EMAIL = _get_secret("ADMIN_EMAIL")
 
 
 def _get_today_start() -> str:
